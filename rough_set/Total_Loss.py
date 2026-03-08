@@ -18,6 +18,34 @@ def compute_fuzzy_similarity(X,weights,sigma=1.0):
 
     return jnp.exp(-weighted_sq_dist/(2 * sigma**2))
 
+
+
+## Original implementation (Stable gradient for future weight learning path but slower and has chances of division by 0 errors. It will ensure calculation is theoretically accurate)
+# def soft_lower_approximation(R, labels, alpha=10.0):
+#     # 1. Mask for samples NOT in class c (j ∉ Cc)
+#     enemy_mask = labels[:, jnp.newaxis] != labels[jnp.newaxis, :]
+    
+#     # 2. Compute the exponent part: e^(α * Rij)
+#     # We subtract a max value for numerical stability (common JAX practice)
+#     # but strictly follow the paper's logic.
+#     exp_R = jnp.exp(alpha * R)
+    
+#     # 3. Apply the mask so we only sum over enemies (j ∉ Cc)
+#     weighted_R = jnp.where(enemy_mask, R * exp_R, 0.0)
+#     sum_exp = jnp.where(enemy_mask, exp_R, 0.0)
+    
+#     # 4. The Smooth Maximum Approximation fraction from your paper
+#     # numerator: Σ (Rij * e^(α * Rij))
+#     # denominator: Σ (e^(α * Rij))
+#     soft_max_R = jnp.sum(weighted_R, axis=1) / (jnp.sum(sum_exp, axis=1) + 1e-8)
+    
+#     # 5. Final membership: μ = 1 - smooth_max
+#     mu = 1.0 - soft_max_R
+    
+#     return mu
+
+
+## Optimised and more aligned with proper jax practices (to be used for high speed for extremely large datasets and to prevent division by 0 error)
 def soft_lower_approximation(R,labels,alpha=10.0):
     #labels is the vector of shape (N,) [1,0,1]
     #R is the similaity matrix found from the prev func
@@ -25,30 +53,12 @@ def soft_lower_approximation(R,labels,alpha=10.0):
     #Mask[i,j] true if i and j have diff labels
     diff_mask=labels[:,jnp.newaxis]!=labels[jnp.newaxis,:]
     diff_similarities=jnp.where(diff_mask,R,-1e9)
-    worst_diff_similarity=jax.nn.logsumexp(alpha*diff_similarities,axis=1)/alpha
+    worst_diff_similarity=jax.nn.logsumexp(alpha*diff_similarities,axis=1)/alpha 
     mu=1.0-worst_diff_similarity
     return mu
 def calculate_rs_loss(mu):
     gamma=jnp.mean(mu)
     return 1.0-gamma
-# def total_loss_fn(params,X,y,lambda1=0.1,lambda2=0.07):
-#     #converting raw weights into sigmoid so that it lies between 0 and 1
-#     weights=jax.nn.sigmoid(params['w'])
-
-#     #1. Fuzzy reln
-#     R=compute_fuzzy_similarity(X,weights)
-    
-#     #2. Soft layer approx
-#     mu=soft_lower_approximation(R,y)
-
-#     #3. RS loss
-#     l_rs=calculate_rs_loss(mu)
-
-#     #4. L1 regularisation to improve accuracy (Feature selection penalty)
-#     l_l1=jnp.sum(jnp.abs(weights))
-
-#     #Total loss= classifier loss (cross entropy)+lambda1*RS_Loss+lambda2
-#     return lambda1*l_rs+lambda2*l_l1
 
 
 ##Loss CE
