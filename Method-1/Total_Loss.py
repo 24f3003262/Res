@@ -1,6 +1,5 @@
 import jax
 import jax.numpy as jnp
-from jax import jit
 
 
 ## Loss RS
@@ -99,7 +98,7 @@ def total_loss_fn(params,X,y,lambda1=0.1,lambda2=0.05):
     mu=soft_lower_approximation(R,y)
     l_rs=calculate_rs_loss(mu)
 
-    # Classificatio loss
+    # Classification loss
     l_ce=compute_classification_loss(params,X_weighted,y)
 
     # Sparse Penalty ||w||1
